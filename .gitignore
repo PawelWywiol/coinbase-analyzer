@@ -19,6 +19,9 @@ cache
 # test
 coverage
 
+# typescript
+*.tsbuildinfo
+
 # misc
 .DS_Store
 *.pem
