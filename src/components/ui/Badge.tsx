@@ -2,7 +2,7 @@
 
 import { BADGE_STYLES } from '@/lib/config';
 
-type BadgeVariant = 'signal' | 'trend' | 'risk';
+type BadgeVariant = 'signal' | 'trend' | 'risk' | 'sentiment';
 
 interface BadgeProps {
   variant: BadgeVariant;

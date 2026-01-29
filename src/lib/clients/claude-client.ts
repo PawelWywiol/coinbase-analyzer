@@ -4,8 +4,10 @@ import { join } from 'node:path';
 import type { TechnicalMetrics } from '../analysis';
 import { ClaudeExecutionError, ClaudeParseError } from '../errors';
 import { type ClaudeAnalysisResult, claudeAnalysisSchema } from '../schemas';
-import type { Analysis, Crypto, Timeframe } from '../types';
+import type { Analysis, Crypto, NewsItem, Timeframe } from '../types';
 import { executeSSHCommand, getSSHConfig } from './ssh-client';
+
+type MetricsPerTimeframe = Record<Timeframe, TechnicalMetrics>;
 
 const generateHeredocDelimiter = (): string => `EOF_${randomBytes(8).toString('hex')}`;
 
@@ -14,34 +16,43 @@ const loadPrompt = (): string => {
   return readFileSync(path, 'utf-8');
 };
 
+const formatTimeframeMetrics = (timeframe: Timeframe, metrics: TechnicalMetrics): string => {
+  const maString = Object.entries(metrics.movingAverages)
+    .filter(([, v]) => v !== undefined)
+    .map(([k, v]) => `${k.toUpperCase()}: $${v?.toFixed(2)}`)
+    .join(', ');
+
+  return `### ${timeframe}
+- Price: $${metrics.currentPrice.toFixed(2)} (${metrics.priceChangePercent >= 0 ? '+' : ''}${metrics.priceChangePercent.toFixed(2)}%)
+- Volatility: ${metrics.volatility.toFixed(2)}%
+- MAs: ${maString || 'N/A'}
+- Support: ${metrics.supportLevels.map((s) => `$${s.toFixed(2)}`).join(', ') || 'N/A'}
+- Resistance: ${metrics.resistanceLevels.map((r) => `$${r.toFixed(2)}`).join(', ') || 'N/A'}
+- Volume: ${metrics.volume24h.toFixed(2)} (avg: ${metrics.avgVolume.toFixed(2)})`;
+};
+
+const formatNewsData = (news: NewsItem[]): string => {
+  if (news.length === 0) return 'No recent news available.';
+  return news.map((n, i) => `${i + 1}. ${n.title} (${n.source}, ${n.pubDate})`).join('\n');
+};
+
 const formatPrompt = (
   template: string,
   crypto: Crypto,
-  timeframe: Timeframe,
-  metrics: TechnicalMetrics,
+  metricsPerTimeframe: MetricsPerTimeframe,
+  news: NewsItem[],
+  weeklyProfitGoal: number,
 ): string => {
-  const maString = Object.entries(metrics.movingAverages)
-    .filter(([, v]) => v !== undefined)
-    .map(([k, v]) => `- ${k.toUpperCase()}: $${v?.toFixed(2)}`)
-    .join('\n');
+  const timeframeOrder: Timeframe[] = ['1d', '7d', '1m', '3m', '6m', '1y', '5y'];
+  const timeframeData = timeframeOrder
+    .map((tf) => formatTimeframeMetrics(tf, metricsPerTimeframe[tf]))
+    .join('\n\n');
 
   return template
     .replace('{{crypto}}', crypto)
-    .replace('{{timeframe}}', timeframe)
-    .replace('{{currentPrice}}', metrics.currentPrice.toFixed(2))
-    .replace('{{priceChangePercent}}', metrics.priceChangePercent.toFixed(2))
-    .replace('{{volatility}}', metrics.volatility.toFixed(2))
-    .replace('{{movingAverages}}', maString)
-    .replace(
-      '{{supportLevels}}',
-      metrics.supportLevels.map((s) => `$${s.toFixed(2)}`).join(', ') || 'N/A',
-    )
-    .replace(
-      '{{resistanceLevels}}',
-      metrics.resistanceLevels.map((r) => `$${r.toFixed(2)}`).join(', ') || 'N/A',
-    )
-    .replace('{{volume24h}}', metrics.volume24h.toFixed(2))
-    .replace('{{avgVolume}}', metrics.avgVolume.toFixed(2));
+    .replace('{{weeklyProfitGoal}}', weeklyProfitGoal.toString())
+    .replace('{{timeframeData}}', timeframeData)
+    .replace('{{newsData}}', formatNewsData(news));
 };
 
 const validateClaudePath = (path: string): void => {
@@ -125,7 +136,10 @@ const parseClaudeResponse = (response: string): ClaudeAnalysisResult => {
 
   const result = claudeAnalysisSchema.safeParse(parsed);
   if (!result.success) {
-    throw new ClaudeParseError(`Invalid response structure: ${result.error.issues[0]?.message}`);
+    const issues = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+    console.error('Claude response validation failed:', JSON.stringify(parsed, null, 2));
+    console.error('Validation errors:', issues);
+    throw new ClaudeParseError(`Invalid response structure: ${issues}`);
   }
 
   return result.data;
@@ -133,20 +147,24 @@ const parseClaudeResponse = (response: string): ClaudeAnalysisResult => {
 
 export const analyzeWithClaude = async (
   crypto: Crypto,
-  timeframe: Timeframe,
-  metrics: TechnicalMetrics,
+  metricsPerTimeframe: MetricsPerTimeframe,
+  news: NewsItem[],
+  weeklyProfitGoal: number,
 ): Promise<Analysis> => {
   const template = loadPrompt();
-  const prompt = formatPrompt(template, crypto, timeframe, metrics);
+  const prompt = formatPrompt(template, crypto, metricsPerTimeframe, news, weeklyProfitGoal);
 
   const response = await runClaudeSSH(prompt);
   const validated = parseClaudeResponse(response);
 
+  // Use 1d metrics for backward compat fields
+  const dayMetrics = metricsPerTimeframe['1d'];
+
   return {
     ...validated,
-    supportLevels: metrics.supportLevels,
-    resistanceLevels: metrics.resistanceLevels,
-    movingAverages: metrics.movingAverages,
-    volatility: metrics.volatility,
+    supportLevels: dayMetrics.supportLevels,
+    resistanceLevels: dayMetrics.resistanceLevels,
+    movingAverages: dayMetrics.movingAverages,
+    volatility: dayMetrics.volatility,
   };
 };

@@ -14,4 +14,9 @@ export const BADGE_STYLES = {
     medium: 'badge-warning',
     high: 'badge-error',
   },
+  sentiment: {
+    positive: 'badge-success',
+    negative: 'badge-error',
+    neutral: 'badge-neutral',
+  },
 } as const;

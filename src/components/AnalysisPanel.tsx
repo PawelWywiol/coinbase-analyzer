@@ -3,9 +3,12 @@
 import type { TechnicalMetrics } from '@/lib/analysis';
 import type { Analysis } from '@/lib/types';
 import {
+  MarketSummaryCard,
   MovingAveragesCard,
   PredictionsCard,
   PriceSignalCard,
+  ProfitPotentialCard,
+  StrategyCard,
   TrendRiskCard,
   VolatilityCard,
 } from './features/analysis';
@@ -55,6 +58,15 @@ export const AnalysisPanel = ({ analysis, metrics, loading, error }: Props) => {
         riskLevel={analysis.riskAssessment.level}
         riskFactors={analysis.riskAssessment.factors}
       />
+
+      <StrategyCard strategy={analysis.strategy} bestTimeframe={analysis.bestTimeframe} />
+
+      <ProfitPotentialCard
+        potentialProfit={analysis.potentialProfit}
+        weeklyTarget={analysis.strategy.weeklyTarget}
+      />
+
+      <MarketSummaryCard marketSummary={analysis.marketSummary} newsImpact={analysis.newsImpact} />
 
       <MovingAveragesCard averages={analysis.movingAverages} />
 

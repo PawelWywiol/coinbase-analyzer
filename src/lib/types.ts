@@ -74,9 +74,41 @@ export interface Analysis {
     mediumTerm: string;
     longTerm: string;
   };
+  bestTimeframe: Timeframe;
+  strategy: TradingStrategy;
+  potentialProfit: PotentialProfit;
+  marketSummary: string;
+  newsImpact: NewsImpact;
 }
 
 export interface CandleData {
   crypto: Crypto;
   timeframes: Record<Timeframe, Candle[]>;
+}
+
+export interface NewsItem {
+  title: string;
+  link: string;
+  pubDate: string;
+  source: string;
+}
+
+export interface TradingStrategy {
+  weeklyTarget: number;
+  recommendedPosition: string;
+  entryPrice: number;
+  stopLoss: number;
+  takeProfit: number;
+  reasoning: string;
+}
+
+export interface PotentialProfit {
+  daily: string;
+  weekly: string;
+  risk: string;
+}
+
+export interface NewsImpact {
+  sentiment: 'positive' | 'negative' | 'neutral';
+  keyEvents: string[];
 }

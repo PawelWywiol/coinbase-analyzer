@@ -5,8 +5,7 @@ describe('analyzeRequestSchema', () => {
   it('should validate correct request', () => {
     const valid = {
       crypto: 'BTC',
-      timeframe: '1d',
-      candles: [{ timestamp: 1, open: 1, high: 2, low: 0, close: 1.5, volume: 100 }],
+      weeklyProfitGoal: 1000,
     };
 
     const result = analyzeRequestSchema.safeParse(valid);
@@ -16,30 +15,27 @@ describe('analyzeRequestSchema', () => {
   it('should reject invalid crypto', () => {
     const invalid = {
       crypto: 'INVALID',
-      timeframe: '1d',
-      candles: [{ timestamp: 1, open: 1, high: 2, low: 0, close: 1.5, volume: 100 }],
+      weeklyProfitGoal: 1000,
     };
 
     const result = analyzeRequestSchema.safeParse(invalid);
     expect(result.success).toBe(false);
   });
 
-  it('should reject empty candles array', () => {
-    const invalid = {
-      crypto: 'BTC',
-      timeframe: '1d',
-      candles: [],
-    };
+  it('should use default weeklyProfitGoal if not provided', () => {
+    const minimal = { crypto: 'BTC' };
 
-    const result = analyzeRequestSchema.safeParse(invalid);
-    expect(result.success).toBe(false);
+    const result = analyzeRequestSchema.safeParse(minimal);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.weeklyProfitGoal).toBe(1000);
+    }
   });
 
-  it('should reject invalid timeframe', () => {
+  it('should reject weeklyProfitGoal less than 1', () => {
     const invalid = {
       crypto: 'BTC',
-      timeframe: '2w',
-      candles: [{ timestamp: 1, open: 1, high: 2, low: 0, close: 1.5, volume: 100 }],
+      weeklyProfitGoal: 0,
     };
 
     const result = analyzeRequestSchema.safeParse(invalid);
